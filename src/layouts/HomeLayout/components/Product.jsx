@@ -3,8 +3,14 @@ import Box from '@mui/material/Box';
 import { alpha } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import { useDispatch } from 'react-redux';
+import { addItemToCart } from '../../../redux/cartSlice';
 
 const Product = ({ product }) => {
+  const dispatch = useDispatch();
+  const handleAddToCart = (id, product) =>{
+    dispatch(addItemToCart({id : id, item : product}))
+  }
   return (
     <Box
       id="product-card"
@@ -41,10 +47,10 @@ const Product = ({ product }) => {
           {product.description}
         </Typography>
         <Typography variant="body1" gutterBottom>
-          Price: ${(product.price??1)/100}
+          Price: ${(product.price)}
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="contained" color="primary">
+          <Button variant="contained" color="primary" onClick={()=>{handleAddToCart(product.id, product)}}>
             Add to Cart
           </Button>
         </Box>

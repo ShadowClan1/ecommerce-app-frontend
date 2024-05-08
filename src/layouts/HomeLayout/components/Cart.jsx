@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -14,49 +14,71 @@ import { alpha } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { useDispatch, useSelector } from "react-redux";
-import { toggleCart } from "../../../redux/cartSlice";
+import {
+  addItemToCart,
+  applyCopounThunk,
+  removeItemFromCart,
+  toggleCart,
+} from "../../../redux/cartSlice";
 
 const Cart = () => {
-  const { open, items: cartContent } = useSelector((state) => state.cart);
+  const {
+    open,
+    items: cartContent,
+    itemQuantity,
+    taxRate,
+    discountPrice,
+    discountCopoun,
+  } = useSelector((state) => state.cart);
+
   const dispatch = useDispatch();
   // Calculate total amount
   const [items, setItems] = useState(
-    cartContent.map((item) => ({ ...item, quantity: 1 }))
+    cartContent.map((item) => ({
+      ...item,
+      quantity: itemQuantity[item?.id] ?? 1,
+    }))
   );
-  const [discountCopoun, setDiscountCopoun] = useState({
-    applied: false,
-    amount: 0,
-  });
-  const subtotal = items.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
-  const taxRate = 0.18; // 18% tax rate
-  const taxAmount = subtotal * taxRate;
-  const totalAmount = subtotal + taxAmount;
 
-  const discount = 40;
+  const [taxAmount, setTaxAmount] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
+  const [copounCode, setCopounCode] = useState('');
+  const [totalAmount, setTotalAmount] = useState(0);
 
-  // Function to handle applying coupon
-  const handleApplyCoupon = () => {
-    // Implement coupon logic here
-    alert("Coupon applied!");
+  useEffect(() => {
+    setItems(
+      cartContent.map((item) => ({
+        ...item,
+        quantity: itemQuantity[item?.id] ?? 1,
+      }))
+    );
+  }, [cartContent]);
+
+  useEffect(() => {
+    const subtotal = items.reduce(
+      (acc, item) => acc + item.price * itemQuantity[item.id],
+      0
+    );
+    setSubtotal(subtotal);
+    const taxAmount = subtotal * taxRate;
+    setTaxAmount(taxAmount);
+    const totalAmount = subtotal + taxAmount - discountPrice;
+    setTotalAmount(totalAmount);
+  }, [cartContent, itemQuantity, open, discountPrice]);
+
+
+  const handleApplyCoupon = async () => {
+    if(copounCode && copounCode.length > 1 ) await dispatch(applyCopounThunk({ copounCode }));
+    else alert('enter a copoun to redeem coupon')
   };
 
-  // Function to increase quantity
-  const increaseQuantity = (index) => {
-    const newItems = [...items];
-    newItems[index].quantity += 1;
-    setItems(newItems);
+
+  const increaseQuantity = (id) => {
+    dispatch(addItemToCart({ id }));
   };
 
-  // Function to decrease quantity
-  const decreaseQuantity = (index) => {
-    const newItems = [...items];
-    if (newItems[index].quantity > 1) {
-      newItems[index].quantity -= 1;
-      setItems(newItems);
-    }
+  const decreaseQuantity = (id) => {
+    dispatch(removeItemFromCart({ id }));
   };
 
   const handleClose = () => {
@@ -78,59 +100,74 @@ const Cart = () => {
               style={{ marginRight: 10, width: 80, height: 80 }}
             />
             <Typography variant="body1" sx={{ fontSize: "14px" }}>
-              {item.name}: ${item.price} x {item.quantity}
+              {item.name}: ${item.price} x {itemQuantity[item.id]}
             </Typography>
-            <IconButton color="primary" onClick={() => increaseQuantity(index)}>
+            <IconButton
+              color="primary"
+              onClick={() => increaseQuantity(item.id)}
+            >
               <AddIcon />
             </IconButton>
-            <IconButton color="primary" onClick={() => decreaseQuantity(index)}>
+            <IconButton
+              color="primary"
+              onClick={() => decreaseQuantity(item.id)}
+            >
               <RemoveIcon />
             </IconButton>
           </Box>
         ))}
 
-        {(cartContent.length >
-          0 ) && (
-            <>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                }}
-              >
-                {discountCopoun.applied && (
-                  <Typography variant="subtitle1">
-                    Discount: ${discountCopoun?.amount}
-                  </Typography>
-                )}
+        {cartContent.length > 0 && (
+          <>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+              }}
+            >
+              <Typography variant="subtitle1">Subtotal: ${subtotal}</Typography>
+              <Typography variant="subtitle1">
+                Tax (18%): ${taxAmount}
+              </Typography>
+              {discountCopoun && (
                 <Typography variant="subtitle1">
-                  Subtotal: ${subtotal}
+                  Discount: - ${discountPrice}
                 </Typography>
-                <Typography variant="subtitle1">
-                  Tax (18%): ${taxAmount}
-                </Typography>
-                <Typography variant="subtitle1">
-                  Total Amount (Including Tax): ${totalAmount}
-                </Typography>
-              </Box>
+              )}
+              <Typography variant="subtitle1">
+                Total Amount (Including Tax): ${totalAmount}
+              </Typography>
+            </Box>
 
-              <Box sx={{ mt: 2 }}>
-                <TextField label="Coupon Code" variant="outlined" fullWidth />
-                <Button
-                  sx={{ mt: 2 }}
-                  variant="contained"
-                  onClick={handleApplyCoupon}
-                >
-                  Apply Coupon
-                </Button>
-              </Box>
-            </>
-          )}
+            <Box sx={{ mt: 2 }}>
+              <TextField
+                label="Coupon Code"
+                variant="outlined"
+                fullWidth
+                onChange={(e) => {
+                  setCopounCode(e.target.value);
+                }}
+                value={copounCode}
+              />
+              <Button
+                sx={{ mt: 2 }}
+                variant="contained"
+                onClick={handleApplyCoupon}
+              >
+                Apply Coupon
+              </Button>
+            </Box>
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Close</Button>
-        <Button color="primary" variant="contained" disabled={(cartContent.length ===0 )}>
+        <Button
+          color="primary"
+          variant="contained"
+          disabled={cartContent.length === 0}
+        >
           Proceed to Buy
         </Button>
       </DialogActions>
